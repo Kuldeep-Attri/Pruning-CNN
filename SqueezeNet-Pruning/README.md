@@ -1,5 +1,7 @@
 # Pruning-CNN
 
+PyTorch implementation of [1611.06440 Pruning Convolutional Neural Networks for Resource Efficient Inference]
+
 This part is modified for "SqueezeNet" from the https://github.com/jacobgil/pytorch-pruning
 
 At each pruning step 128 filters are removed from the network.
