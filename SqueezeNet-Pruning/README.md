@@ -1,6 +1,6 @@
 # Pruning-CNN
 
-# This part is modified for "SqueezeNet" from the https://github.com/jacobgil/pytorch-pruning
+This part is modified for "SqueezeNet" from the https://github.com/jacobgil/pytorch-pruning
 
 At each pruning step 128 filters are removed from the network.
 
