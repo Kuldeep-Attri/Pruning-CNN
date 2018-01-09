@@ -133,7 +133,7 @@ class FilterPrunner:
 		for l in filters_to_prune_per_layer:
 			for i in filters_to_prune_per_layer[l]:
 				filters_to_prune.append((l, i))
-		print("512 flters to prune: ", filters_to_prune)
+		
 		return filters_to_prune				
 
 class PrunningFineTuner_Squeezenet:
@@ -244,7 +244,6 @@ class PrunningFineTuner_Squeezenet:
 			self.model = model.cuda()
 			message = str(100*float(self.total_num_filters()) / number_of_filters) + "%"
 			print ("Filters prunned", str(message))
-			print("This is the accuracy after making chnages...")
 			self.test()
 			print ("Fine tuning to recover from prunning iteration.")
 			optimizer = optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9) # ......
