@@ -19,11 +19,10 @@ import time
 
 from flops import *
 
-class ModifiedResNetModel(torch.nn.Module): # This class create an object 
+class ModifiedSqueezeNetModel(torch.nn.Module): # This class create an object 
 	def __init__(self):
-		super(ModifiedResNetModel, self).__init__()
+		super(ModifiedSqueezeNetModel, self).__init__()
 		model = models.squeezenet1_1(pretrained=True)
-		print(model)
 		self.features = model.features
 		for param in self.features.parameters():
 			param.requires_grad = False
@@ -63,18 +62,14 @@ class FilterPrunner:
 		activation_index = 0 # What is activation index??
 		list_output=[]
 		for layer, (name, module) in enumerate(self.model.features._modules.items()):
-			# print "x is: ",x," layer is: ",layer," name is: ",name, " module is: ", module
-			# print(type(module))
 			if isinstance(module, torch.nn.modules.conv.Conv2d):
 				x = module(x)
-				# print (x)				
 				x.register_hook(self.compute_rank)
 				self.activations.append(x)
 				self.activation_to_layer[activation_index] = layer
 				activation_index += 1
 			elif isinstance(module, torchvision.models.squeezenet.Fire):
 				x=module(x)
-				# print (x)
 				x.register_hook(self.compute_rank)
 				self.activations.append(x)
 				self.activation_to_layer[activation_index] = layer
@@ -90,12 +85,10 @@ class FilterPrunner:
 	def compute_rank(self, grad):
 		activation_index = len(self.activations) - self.grad_index - 1
 		activation = self.activations[activation_index]
-		# print ("hello grad0:   ",grad)
 		values = \
 			torch.sum((activation * grad), dim = 0, keepdim=True).\
 				sum(dim=2, keepdim=True).sum(dim=3, keepdim=True)[0, :, 0, 0].data
 		
-		# Normalize the rank by the filter dimensions
 		values = \
 			values / (activation.size(0) * activation.size(2) * activation.size(3))
 
@@ -112,7 +105,6 @@ class FilterPrunner:
 			for j in range(self.filter_ranks[i].size(0)):
 				data.append((self.activation_to_layer[i], j, self.filter_ranks[i][j]))
 
-		# print("filter rank...", self.filter_ranks)
 		return nsmallest(num, data, itemgetter(2))
 
 	def normalize_ranks_per_layer(self):
@@ -141,15 +133,13 @@ class FilterPrunner:
 		for l in filters_to_prune_per_layer:
 			for i in filters_to_prune_per_layer[l]:
 				filters_to_prune.append((l, i))
-		# print("512 flters to prune: ", filters_to_prune)
+		print("512 flters to prune: ", filters_to_prune)
 		return filters_to_prune				
 
-class PrunningFineTuner_VGG16:
+class PrunningFineTuner_Squeezenet:
 	def __init__(self, train_path, test_path, model):
 		self.train_data_loader = dataset.loader(train_path)
 		self.test_data_loader = dataset.test_loader(test_path)
-
-		#self.test_single_loader = dataset.test_loader(test_single_path) # I am adding this line...
 
 		self.model = model
 		self.criterion = torch.nn.CrossEntropyLoss()
@@ -204,11 +194,8 @@ class PrunningFineTuner_VGG16:
 
 	def get_candidates_to_prune(self, num_filters_to_prune):
 		self.prunner.reset()
-		# print("Hello Havana: ", len(self.prunner.filter_ranks))
 		self.train_epoch(rank_filters = True)
-		# print("Hello Havana2: ",len(self.prunner.filter_ranks))
 		self.prunner.normalize_ranks_per_layer()
-		# print("Hello havana3: ",len(self.prunner.filter_ranks))
 		return self.prunner.get_prunning_plan(num_filters_to_prune)
 		
 	def total_num_filters(self):
@@ -216,7 +203,6 @@ class PrunningFineTuner_VGG16:
 
 		for name, module in self.model.features._modules.items():
 			if isinstance(module, torch.nn.modules.conv.Conv2d ):
-				print("nam eis ",name )
 				filters = filters + module.out_channels
 			if isinstance(module, torchvision.models.squeezenet.Fire):
 				filters += module.expand1x1.out_channels + module.expand3x3.out_channels 
@@ -234,18 +220,16 @@ class PrunningFineTuner_VGG16:
 			param.requires_grad = True
 
 		number_of_filters = self.total_num_filters()
-		print("Total number of filters: ",number_of_filters)
-		num_filters_to_prune_per_iteration = 64
+		num_filters_to_prune_per_iteration = 128
 		iterations = int(float(number_of_filters) / num_filters_to_prune_per_iteration)
 
-		iterations = int(iterations * 2.0 / 4)
+		iterations = int(iterations * 2.0 / 3)
 		print ("Number of prunning iterations to reduce 50% filters", iterations)
 		for _ in range(iterations):
 			print ("Ranking filters.. ")
 			prune_targets = self.get_candidates_to_prune(num_filters_to_prune_per_iteration) # Get filters to prune...
 			layers_prunned = {}
 			for layer_index, filter_index in prune_targets:
-				# print("layer_index: ",layer_index, " filter_index: ",filter_index)
 				if layer_index not in layers_prunned:
 					layers_prunned[layer_index] = 0
 				layers_prunned[layer_index] = layers_prunned[layer_index] + 1 
@@ -255,18 +239,16 @@ class PrunningFineTuner_VGG16:
 			model = self.model.cpu()
 			model_1 = model
 			for layer_index, filter_index in prune_targets:
-				# print "layer_index: ",layer_index, " ada ", filter_index
-				model = prune_vgg16_conv_layer(model, layer_index, filter_index)
+				model = prune_squeezenet_conv_layer(model, layer_index, filter_index)
 
 			self.model = model.cuda()
-			print(model)
 			message = str(100*float(self.total_num_filters()) / number_of_filters) + "%"
 			print ("Filters prunned", str(message))
+			print("This is the accuracy after making chnages...")
 			self.test()
 			print ("Fine tuning to recover from prunning iteration.")
-			optimizer = optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9) # ......
+			optimizer = optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9) # ......
 			self.train(optimizer, epoches = 10)
-			# print("final shape:  ", model.parameters())
 
 		print ("Finished. Going to fine tune the model a bit more")
 		self.train(optimizer, epoches = 15)
@@ -304,17 +286,18 @@ if __name__ == '__main__':
 	args = get_args()
 
 	if args.flops:
+		# main_(torch.load("model").cuda())
 		main_(torch.load("model_prunned").cuda())
 	elif args.run:
 		model = torch.load(args.model).cuda()
 		test_single(model, args.test_path)
 	else:	
 		if args.train:
-			model = ModifiedResNetModel().cuda() # Create a model
+			model = ModifiedSqueezeNetModel().cuda() # Create a model
 		elif args.prune:
 			model = torch.load("model").cuda()
 
-		fine_tuner = PrunningFineTuner_VGG16(args.train_path, args.test_path, model)
+		fine_tuner = PrunningFineTuner_Squeezenet(args.train_path, args.test_path, model)
 
 		if args.train:
 			fine_tuner.train(epoches = 20) # 
