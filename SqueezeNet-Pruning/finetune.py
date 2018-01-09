@@ -224,7 +224,7 @@ class PrunningFineTuner_Squeezenet:
 		iterations = int(float(number_of_filters) / num_filters_to_prune_per_iteration)
 
 		iterations = int(iterations * 2.0 / 3)
-		print ("Number of prunning iterations to reduce 50% filters", iterations)
+		print ("Number of prunning iterations to reduce 67% filters", iterations)
 		for _ in range(iterations):
 			print ("Ranking filters.. ")
 			prune_targets = self.get_candidates_to_prune(num_filters_to_prune_per_iteration) # Get filters to prune...
