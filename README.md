@@ -1,3 +1,3 @@
 # Pruning-CNN
 
-Prunign Deep Neural Networks.
+Pruning Deep Neural Networks.
