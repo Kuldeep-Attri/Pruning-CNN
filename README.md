@@ -1,3 +1,3 @@
 # Pruning-CNN
 
-# https://github.com/jacobgil/pytorch-pruning
+Prunign Deep Neural Networks.
